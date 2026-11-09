@@ -130,6 +130,7 @@ class CoordinatorComprePaymentController extends Controller
     {
         $user = $request->user();
         app(ExamReviewAccess::class)->authorize($user);
+        abort_unless($user->role === 'Administrative Assistant', 403);
 
         if (! Schema::hasTable('payment_submissions')) {
             return back()->withErrors(['status' => 'Payments table not found.']);
@@ -173,6 +174,7 @@ class CoordinatorComprePaymentController extends Controller
     {
         $user = $request->user();
         app(ExamReviewAccess::class)->authorize($user);
+        abort_unless($user->role === 'Administrative Assistant', 403);
 
         $request->validate([
             'remarks' => ['required', 'string', 'min:3', 'max:500'],

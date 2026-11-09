@@ -27,6 +27,13 @@ export type ExamApplicationFull = {
     status?: string; // pending|approved|rejected|...
     subjects?: ExamSubject[];
     created_at?: string | null;
+    exam_schedule: {
+        date: string;
+        time: string;
+        venue: string;
+        proctors: string[];
+        teacher_assigned: string | null;
+    } | null;
 };
 
 type Props = {
@@ -52,6 +59,12 @@ function statusBadge(status?: string) {
             return (
                 <Badge className="gap-1 border border-amber-200 bg-amber-100 text-amber-800">
                     <Hourglass size={14} /> Awaiting Registrar approval
+                </Badge>
+            );
+        case 'assistant_pending':
+            return (
+                <Badge className="gap-1 border border-amber-200 bg-amber-100 text-amber-800">
+                    <Hourglass size={14} /> Awaiting Administrative Assistant approval
                 </Badge>
             );
         default:
@@ -133,6 +146,22 @@ export default function DisplayApplication({ application }: Props) {
                     </div>
 
                     <Separator className="my-4" />
+
+                    {application.exam_schedule && (
+                        <>
+                            <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm dark:border-green-900 dark:bg-green-950/30">
+                                <h3 className="font-semibold text-green-800 dark:text-green-300">Your exam schedule</h3>
+                                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                                    <div><span className="font-medium">Date:</span> {format(new Date(`${application.exam_schedule.date}T00:00:00`), 'PPP')}</div>
+                                    <div><span className="font-medium">Time:</span> {application.exam_schedule.time}</div>
+                                    <div><span className="font-medium">Number of rooms:</span> {application.exam_schedule.venue}</div>
+                                    <div><span className="font-medium">Proctors:</span> {application.exam_schedule.proctors.join(', ') || '—'}</div>
+                                    <div><span className="font-medium">Teacher assigned:</span> {application.exam_schedule.teacher_assigned || '—'}</div>
+                                </div>
+                            </div>
+                            <Separator className="my-4" />
+                        </>
+                    )}
 
                     {/* Two-column content like defense details */}
                     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

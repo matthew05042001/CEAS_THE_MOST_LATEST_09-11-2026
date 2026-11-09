@@ -29,12 +29,13 @@ type Props = {
     paged: ComprePaymentSummary[];
     columns: Columns;
     tabType?: 'pending' | 'approved' | 'rejected';
+    canReview?: boolean;
     onRowApprove?: (id: number) => void;
     onRowReject?: (id: number) => void;
     onRowRetrieve?: (id: number) => void;
 };
 
-export default function TableComprePayment({ paged, columns, tabType, onRowRetrieve }: Props) {
+export default function TableComprePayment({ paged, columns, tabType, canReview = false, onRowRetrieve }: Props) {
     const [selected, setSelected] = useState<number[]>([]);
     const [selectedRow, setSelectedRow] = useState<ComprePaymentSummary | null>(null);
     const [approveId, setApproveId] = useState<number | null>(null);
@@ -238,7 +239,7 @@ export default function TableComprePayment({ paged, columns, tabType, onRowRetri
                                             </DialogContent>
                                         </Dialog>
 
-                                        {tabType === 'pending' && (
+                                        {canReview && tabType === 'pending' && (
                                             <>
                                                 {/* Reject modal (with reason) */}
                                                 <Button
@@ -315,7 +316,7 @@ export default function TableComprePayment({ paged, columns, tabType, onRowRetri
                                             </>
                                         )}
 
-                                        {tabType === 'rejected' && (
+                                        {canReview && tabType === 'rejected' && (
                                             <Button
                                                 size="sm"
                                                 variant="outline"

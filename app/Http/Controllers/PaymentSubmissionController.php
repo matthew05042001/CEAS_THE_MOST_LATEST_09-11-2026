@@ -26,9 +26,10 @@ class PaymentSubmissionController extends Controller
             ->first();
         $approvalStatus = match (true) {
             ! $application => 'not_submitted',
-            strtolower($application->final_approval_status ?? '') === 'rejected' => 'rejected',
-            strtolower($application->final_approval_status ?? '') !== 'approved' => 'coordinator_pending',
+            strtolower($application->final_approval_status ?? '') === 'rejected'
+                || strtolower($application->registrar_approval_status ?? '') === 'rejected' => 'rejected',
             strtolower($application->registrar_approval_status ?? 'pending') !== 'approved' => 'registrar_pending',
+            strtolower($application->final_approval_status ?? '') !== 'approved' => 'assistant_pending',
             default => 'approved',
         };
 
@@ -79,7 +80,7 @@ class PaymentSubmissionController extends Controller
             || strtolower($application->registrar_approval_status ?? 'pending') !== 'approved'
         ) {
             throw \Illuminate\Validation\ValidationException::withMessages([
-                'form' => 'Payment is available only after the Coordinator and Registrar approve your comprehensive exam application.',
+                'form' => 'Payment is available only after the Registrar and Administrative Assistant approve your comprehensive exam application.',
             ]);
         }
 

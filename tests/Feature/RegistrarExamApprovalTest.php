@@ -3,6 +3,7 @@
 use App\Models\ExamApplication;
 use App\Models\ExamApplicationSubject;
 use App\Models\PaymentSubmission;
+use App\Models\StudentResponse;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -14,12 +15,12 @@ function createRegistrarReviewApplication(User $student, array $overrides = []):
         'school_year' => '2026-2027',
         'program' => $student->program ?? 'Master of Arts in Education',
         'permit_status' => 'pending',
-        'final_approval_status' => 'approved',
+        'final_approval_status' => 'pending',
         'created_at' => now(),
     ], $overrides));
 }
 
-it('shows Coordinator-approved applications awaiting final approval on the Registrar dashboard', function () {
+it('shows newly submitted applications awaiting Registrar approval on the Registrar dashboard', function () {
     $this->withoutVite();
     $student = User::factory()->create([
         'role' => 'Student',
@@ -40,7 +41,7 @@ it('shows Coordinator-approved applications awaiting final approval on the Regis
     ]);
     createRegistrarReviewApplication($student, [
         'school_year' => '2024-2025',
-        'final_approval_status' => 'pending',
+        'final_approval_status' => 'rejected',
     ]);
 
     $this->actingAs(User::factory()->create(['role' => 'Registrar']))
@@ -51,10 +52,28 @@ it('shows Coordinator-approved applications awaiting final approval on the Regis
             ->has('registrarApplications.data', 1)
             ->where('registrarApplications.data.0.application_id', $application->application_id)
             ->where('registrarApplications.data.0.student_name', $student->display_name)
+            ->where('registrarApplications.data.0.aa_evaluated', false)
             ->where('registrarApplications.data.0.subjects.0.name', 'Research Methods'));
+
+    StudentResponse::create([
+        'user_id' => $student->id,
+        'family_name' => $student->last_name,
+        'first_name' => $student->first_name,
+        'program' => $student->program,
+        'contact_number' => '09123456789',
+        'email_address' => $student->email,
+        'id_number' => $student->school_id,
+        'evaluated_at' => now(),
+    ]);
+
+    $this->actingAs(User::factory()->create(['role' => 'Registrar']))
+        ->get('/dashboard')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('registrarApplications.data.0.aa_evaluated', true));
 });
 
-it('allows only the Registrar to approve a Coordinator-approved application for payment', function () {
+it('allows only the Registrar to approve an application before Administrative Assistant review', function () {
     $student = User::factory()->create(['role' => 'Student', 'school_id' => 'REGISTRAR-APPROVAL-STUDENT']);
     $application = createRegistrarReviewApplication($student);
     $registrar = User::factory()->create(['role' => 'Registrar']);
@@ -75,9 +94,9 @@ it('allows only the Registrar to approve a Coordinator-approved application for 
     expect($application->fresh()->registrar_approved_at)->not->toBeNull();
 });
 
-it('does not allow Registrar approval before Coordinator approval', function () {
+it('does not allow Registrar approval of an application already rejected by the Administrative Assistant', function () {
     $student = User::factory()->create(['role' => 'Student', 'school_id' => 'REGISTRAR-WAIT-STUDENT']);
-    $application = createRegistrarReviewApplication($student, ['final_approval_status' => 'pending']);
+    $application = createRegistrarReviewApplication($student, ['final_approval_status' => 'rejected']);
     $registrar = User::factory()->create(['role' => 'Registrar']);
 
     $this->actingAs($registrar)
@@ -87,7 +106,7 @@ it('does not allow Registrar approval before Coordinator approval', function () 
     expect($application->fresh()->registrar_approval_status)->toBe('pending');
 });
 
-it('requires Registrar approval before showing or accepting exam payment', function () {
+it('requires Registrar and Administrative Assistant approval before showing or accepting exam payment', function () {
     $this->withoutVite();
     $student = User::factory()->create(['role' => 'Student', 'school_id' => 'PAYMENT-GATE-STUDENT']);
     $application = createRegistrarReviewApplication($student);
@@ -113,6 +132,15 @@ it('requires Registrar approval before showing or accepting exam payment', funct
         'registrar_approval_status' => 'approved',
         'registrar_approved_at' => now(),
     ]);
+    $this->get('/payment')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('canSubmit', false)
+            ->where('approvalStatus', 'assistant_pending'));
+    $this->post('/payment', $payload)->assertSessionHasErrors('form');
+    expect(PaymentSubmission::count())->toBe(0);
+
+    $application->update(['final_approval_status' => 'approved']);
     $this->get('/payment')
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page

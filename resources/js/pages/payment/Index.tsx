@@ -11,7 +11,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 type PageProps = {
     student: { name: string; program: string | null; email?: string | null };
     canSubmit: boolean;
-    approvalStatus: 'not_submitted' | 'coordinator_pending' | 'registrar_pending' | 'approved' | 'rejected';
+    approvalStatus: 'not_submitted' | 'registrar_pending' | 'assistant_pending' | 'approved' | 'rejected';
     payment: {
         payment_id: number;
         or_number: string;
@@ -83,10 +83,12 @@ export default function Index() {
                                         {approvalStatus === 'not_submitted'
                                             ? 'Submit your comprehensive exam application first.'
                                             : approvalStatus === 'rejected'
-                                              ? 'Your application was not approved by the Coordinator. Contact the Graduate School for assistance.'
-                                              : approvalStatus === 'coordinator_pending'
-                                                ? 'Payment will be available after the Coordinator approves your application.'
-                                                : 'Payment will be available after the Registrar gives final approval.'}
+                                              ? 'Your application was not approved. Contact the Graduate School for assistance.'
+                                              : approvalStatus === 'registrar_pending'
+                                                ? 'Payment will be available after the Registrar approves your application.'
+                                                : approvalStatus === 'assistant_pending'
+                                                  ? 'Payment will be available after the Administrative Assistant approves your application.'
+                                                  : ''}
                                     </p>
                                 )}
                                 <div className="mt-1 text-xs">{statusBadge}</div>
@@ -101,7 +103,7 @@ export default function Index() {
                                 canOpenForm || devOverrides.debugOpen
                                     ? 'Submit payment'
                                     : !effectiveCanSubmit
-                                      ? 'You can submit payment only after Coordinator and Registrar approval.'
+                                      ? 'You can submit payment only after Registrar and Administrative Assistant approval.'
                                       : 'Payment already submitted'
                             }
                         >

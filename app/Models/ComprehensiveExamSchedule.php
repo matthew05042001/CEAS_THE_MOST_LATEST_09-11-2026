@@ -3,12 +3,14 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class ComprehensiveExamSchedule extends Model
 {
     protected $fillable = [
         'exam_id',
+        'exam_application_id',
         'program',
         'exam_date',
         'exam_time',
@@ -27,5 +29,10 @@ class ComprehensiveExamSchedule extends Model
     {
         return $this->belongsToMany(User::class, 'comprehensive_exam_schedule_proctors', 'schedule_id', 'user_id')
             ->withTimestamps();
+    }
+
+    public function application(): BelongsTo
+    {
+        return $this->belongsTo(ExamApplication::class, 'exam_application_id', 'application_id');
     }
 }

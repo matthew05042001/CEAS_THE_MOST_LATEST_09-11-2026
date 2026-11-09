@@ -28,6 +28,13 @@ type ApplicationVM = {
     office_address?: string | null;
     program: string;
     created_at?: string;
+    exam_schedule: {
+        date: string;
+        time: string;
+        venue: string;
+        proctors: string[];
+        teacher_assigned: string | null;
+    } | null;
     subjects: Subject[];
     first_name: string;
     middle_name?: string | null;
@@ -259,14 +266,16 @@ export default function ComprehensiveExamIndex() {
                                         email: application.email,
                                         status:
                                             application.final_approval_status?.toLowerCase() === 'rejected'
+                                                || application.registrar_approval_status?.toLowerCase() === 'rejected'
                                                 ? 'rejected'
-                                                : application.registrar_approval_status?.toLowerCase() === 'approved'
-                                                  ? 'approved'
+                                                : application.registrar_approval_status?.toLowerCase() !== 'approved'
+                                                  ? 'registrar_pending'
                                                   : application.final_approval_status?.toLowerCase() === 'approved'
-                                                    ? 'registrar_pending'
-                                                    : 'pending',
+                                                  ? 'approved'
+                                                  : 'assistant_pending',
                                         subjects: application.subjects,
                                         created_at: application.created_at ?? null,
+                                        exam_schedule: application.exam_schedule,
                                     }}
                                 />
                             ) : (

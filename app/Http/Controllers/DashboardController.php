@@ -80,8 +80,14 @@ class DashboardController extends Controller
                 ],
                 'registrarApplications' => ExamApplication::query()
                     ->with('subjects')
-                    ->where('final_approval_status', 'approved')
-                    ->where('registrar_approval_status', 'pending')
+                    ->where(function ($query) {
+                        $query->whereNull('final_approval_status')
+                            ->orWhere('final_approval_status', 'pending');
+                    })
+                    ->where(function ($query) {
+                        $query->whereNull('registrar_approval_status')
+                            ->orWhere('registrar_approval_status', 'pending');
+                    })
                     ->latest('application_id')
                     ->paginate(25, ['*'], 'registrar_page')
                     ->withQueryString()
@@ -91,12 +97,16 @@ class DashboardController extends Controller
                             ->where('school_id', $studentId)
                             ->when(ctype_digit($studentId), fn ($query) => $query->orWhereKey((int) $studentId))
                             ->first();
+                        $studentResponse = $student
+                            ? StudentResponse::query()->where('user_id', $student->id)->latest('id')->first()
+                            : null;
 
                         return [
                             'application_id' => $application->application_id,
                             'student_name' => $student?->display_name ?? 'Student account not found',
                             'student_email' => $student?->email,
                             'student_id' => $student?->school_id ?? $application->student_id,
+                            'aa_evaluated' => $studentResponse?->evaluated_at !== null,
                             'program' => $application->program,
                             'school_year' => $application->school_year,
                             'created_at' => $application->created_at,

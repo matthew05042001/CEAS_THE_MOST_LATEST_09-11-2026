@@ -34,7 +34,7 @@ class ComprehensiveExamController extends Controller
         }
 
         // STUDENT VIEW
-        $application = ExamApplication::with('subjects')
+        $application = ExamApplication::with(['subjects', 'examSchedule.proctorUsers'])
             ->where('student_id', $studentId)
             ->latest('created_at')
             ->first();
@@ -52,6 +52,13 @@ class ComprehensiveExamController extends Controller
                 'office_address' => $application->office_address,
                 'program' => $application->program,
                 'created_at' => $application->created_at,
+                'exam_schedule' => $application->examSchedule ? [
+                    'date' => $application->examSchedule->exam_date?->format('Y-m-d'),
+                    'time' => substr((string) $application->examSchedule->exam_time, 0, 5),
+                    'venue' => $application->examSchedule->venue,
+                    'proctors' => $application->examSchedule->proctorUsers->map(fn ($proctor) => $proctor->display_name)->all(),
+                    'teacher_assigned' => $application->examSchedule->teacher_assigned,
+                ] : null,
                 // subjects show up now
                 'subjects' => $application->subjects->map(fn ($s) => [
                     'subject' => $s->subject_name,
@@ -88,7 +95,7 @@ class ComprehensiveExamController extends Controller
             'officeAddress' => ['nullable', 'string', 'max:255'],
             'mobileNo' => ['required', 'string', 'max:50'],
             'telephoneNo' => ['nullable', 'string', 'max:50'],
-            'subjects' => ['required', 'array', 'min:1'],
+            'subjects' => ['sometimes', 'array'],
             'subjects.*.subject' => ['required', 'string', 'max:255'],
             'subjects.*.date' => ['required', 'date'],
             'subjects.*.startTime' => ['required', 'date_format:H:i'],
@@ -102,7 +109,9 @@ class ComprehensiveExamController extends Controller
         }
 
         if (ExamApplication::where('student_id', $studentId)->where('school_year', $validated['schoolYear'])->exists()) {
-            return to_route('comprehensive-exam.index')->with('info', 'You already have an application for this school year.');
+            throw ValidationException::withMessages([
+                'schoolYear' => 'You already have an application for this school year.',
+            ]);
         }
         $eligibility = app(ComprehensiveEligibilityService::class)->check($request);
         if (($eligibility['eligible'] ?? false) !== true) {
@@ -125,11 +134,12 @@ class ComprehensiveExamController extends Controller
 
             // Only create subjects if this is a new application
             if (! $application->wasRecentlyCreated) {
-                return to_route('comprehensive-exam.index')
-                    ->with('info', 'You already have an application for this school year.');
+                throw ValidationException::withMessages([
+                    'schoolYear' => 'You already have an application for this school year.',
+                ]);
             }
 
-            foreach ($validated['subjects'] as $s) {
+            foreach ($validated['subjects'] ?? [] as $s) {
                 $application->subjects()->create([
                     'subject_name' => $s['subject'],
                     'exam_date' => $s['date'],

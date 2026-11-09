@@ -376,14 +376,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/coordinator/compre-exam', [CoordinatorCompreExamController::class, 'index'])
         ->name('coordinator.compre-exam.index');
     Route::post('/coordinator/compre-exam/{application}/review', [CoordinatorCompreExamController::class, 'review'])->name('coordinator.compre-exam.review');
+    Route::post('/coordinator/compre-exam/{application}/clearance', [CoordinatorCompreExamController::class, 'setExamClearance'])
+        ->name('coordinator.compre-exam.clearance');
     Route::get('/coordinator/compre-payment', [CoordinatorComprePaymentController::class, 'index'])
         ->name('coordinator.compre-payment.index');
     Route::get('/coordinator/compre-schedule', [CoordinatorCompreScheduleController::class, 'index'])
         ->name('coordinator.compre-schedule.index');
     Route::post('/coordinator/compre-schedule', [CoordinatorCompreScheduleController::class, 'store'])
         ->name('coordinator.compre-schedule.store');
-    Route::put('/coordinator/compre-schedule/{schedule}', [CoordinatorCompreScheduleController::class, 'update'])
-        ->name('coordinator.compre-schedule.update');
     Route::post('/coordinator/compre-payment/{id}/approve', [CoordinatorComprePaymentController::class, 'approve'])
         ->name('coordinator.compre-payment.approve');
     Route::post('/coordinator/compre-payment/{id}/reject', [CoordinatorComprePaymentController::class, 'reject'])

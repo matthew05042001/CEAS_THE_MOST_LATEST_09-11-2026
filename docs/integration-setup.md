@@ -34,6 +34,8 @@ Verified locally: application creation, subject schedule storage, duplicate subm
 
 Live eligibility still depends on the school portal session; demo accounts and current Google sign-in do not establish that session. Without it the eligibility API reports that verification is unavailable. The existing coordinator local-development eligibility bypass is separate from the student's check. Exam submission now enforces the existing eligibility result on the server; unverified eligibility blocks submission. This integration does not certify Registrar/Dean approval, results release, or proctor invitation workflows as complete.
 
+Comprehensive Exam applications go to the Registrar first and then the Administrative Assistant. Exam payment is available only after both approvals.
+
 The inherited route audit still finds15 pre-existing route handlers that are absent. Their details are in `docs/diagram-audit-results.json`. They are not part of the newly integrated Finance endpoints.
 
 ## Notifications and configuration

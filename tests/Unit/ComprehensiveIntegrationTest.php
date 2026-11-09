@@ -42,6 +42,11 @@ beforeEach(function () {
     foreach (['exam_application', 'exam_application_subject'] as $table) {
         (require glob(database_path('migrations/*create_'.$table.'_table.php'))[0])->up();
     }
+    (require database_path('migrations/2026_11_04_000001_create_comprehensive_exam_schedules.php'))->up();
+    (require database_path('migrations/2026_11_04_000002_add_proctors_to_comprehensive_exam_schedules.php'))->up();
+    (require database_path('migrations/2026_11_04_000003_add_teacher_assigned_to_comprehensive_exam_schedules.php'))->up();
+    (require database_path('migrations/2026_11_08_000002_link_comprehensive_exam_schedules_to_applications.php'))->up();
+    (require database_path('migrations/2026_11_05_000001_create_comprehensive_exam_schedule_proctors_table.php'))->up();
     (require database_path('migrations/2026_10_24_000002_add_exam_subject_schedule_fields.php'))->up();
     (require database_path('migrations/2026_11_04_000004_create_student_responses_table.php'))->up();
     (require database_path('migrations/2026_11_04_000005_add_evaluation_fields_to_student_responses.php'))->up();
@@ -50,7 +55,7 @@ beforeEach(function () {
     }
 });
 afterEach(function () {
-    foreach (['student_responses', 'exam_application_subject', 'exam_application', 'notifications', 'defense_requests', 'advisers', 'users'] as $t) {
+    foreach (['comprehensive_exam_schedule_proctors', 'comprehensive_exam_schedules', 'student_responses', 'exam_application_subject', 'exam_application', 'notifications', 'defense_requests', 'advisers', 'users'] as $t) {
         Schema::dropIfExists($t);
     }
 });
@@ -68,7 +73,9 @@ function integratedExamData(): array
     ];
 }
 it('persists an exam application and its subject schedule using the migrated schema', function () {
-    $this->actingAs(User::find(1))->post('/comprehensive-exam', integratedExamData())->assertRedirect('/comprehensive-exam');
+    $this->actingAs(User::find(1))->post('/comprehensive-exam', integratedExamData())
+        ->assertRedirect('/comprehensive-exam')
+        ->assertSessionHas('success', 'Application submitted.');
     expect(DB::table('exam_application')->count())->toBe(1)->and(DB::table('exam_application')->value('student_id'))->toBe('COMPRE-1')->and(DB::table('exam_application_subject')->value('exam_date'))->toBe('2026-11-20');
     expect(DB::table('student_responses')->count())->toBe(1)
         ->and(DB::table('student_responses')->value('contact_number'))->toBe('09123456789')
@@ -76,10 +83,22 @@ it('persists an exam application and its subject schedule using the migrated sch
         ->and(DB::table('student_responses')->value('id_number'))->toBe('COMPRE-1');
     $this->get('/comprehensive-exam')->assertOk()->assertInertia(fn (Assert $p) => $p->component('student/submissions/comprehensive-exam/Index')->where('application.subjects.0.subject', 'Research Methods'));
 });
+it('allows an application to be submitted without student-entered exam schedules', function () {
+    $data = integratedExamData();
+    unset($data['subjects']);
+
+    $this->actingAs(User::find(1))->post('/comprehensive-exam', $data)->assertRedirect('/comprehensive-exam');
+
+    expect(DB::table('exam_application')->count())->toBe(1)
+        ->and(DB::table('exam_application_subject')->count())->toBe(0)
+        ->and(DB::table('student_responses')->count())->toBe(1);
+});
 it('does not duplicate an exam application or subjects in the same school year', function () {
     $this->actingAs(User::find(1));
     $this->post('/comprehensive-exam', integratedExamData());
-    $this->post('/comprehensive-exam', integratedExamData())->assertRedirect();
+    $this->post('/comprehensive-exam', integratedExamData())
+        ->assertRedirect()
+        ->assertSessionHasErrors('schoolYear');
     expect(DB::table('exam_application')->count())->toBe(1)
         ->and(DB::table('exam_application_subject')->count())->toBe(1)
         ->and(DB::table('student_responses')->count())->toBe(1);

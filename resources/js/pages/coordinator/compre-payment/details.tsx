@@ -3,6 +3,14 @@ import { format } from 'date-fns';
 import { CreditCard, GraduationCap, Mail, Receipt, User2 } from 'lucide-react';
 import type { ComprePaymentSummary } from './Index';
 
+function resolveProofUrl(path: string): string {
+    const value = path.trim();
+    if (/^https?:\/\//i.test(value)) return value;
+
+    const relativePath = value.replace(/^\/?storage\//, '').replace(/^\/+/, '');
+    return `/storage/${relativePath.split('/').map(encodeURIComponent).join('/')}`;
+}
+
 export default function Details({ payment }: { payment: ComprePaymentSummary }) {
     const statusCls =
         payment.status === 'approved'
@@ -80,7 +88,7 @@ export default function Details({ payment }: { payment: ComprePaymentSummary }) 
                     {payment.proof_url ? (
                         <div className="md:col-span-2">
                             <div className="text-muted-foreground mb-1 text-xs">Proof</div>
-                            <a href={payment.proof_url} target="_blank" rel="noreferrer" className="text-primary break-all underline">
+                            <a href={resolveProofUrl(payment.proof_url)} target="_blank" rel="noreferrer" className="text-primary break-all underline">
                                 {payment.proof_url}
                             </a>
                         </div>

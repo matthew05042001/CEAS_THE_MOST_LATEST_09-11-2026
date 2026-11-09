@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ExamApplication;
 use App\Models\ComprehensiveExamSchedule;
+use App\Models\CoordinatorProgram;
 use App\Models\Notification;
 use App\Models\StudentResponse;
 use App\Models\User;
@@ -28,7 +29,7 @@ class CoordinatorCompreExamController extends Controller
                 'eligible' => [],
                 'notEligible' => [],
                 'counts' => ['eligible' => 0, 'notEligible' => 0],
-                ...$this->scheduleManagementData($user),
+                'proctorOptions' => $this->scheduleManagementData($user),
             ]);
         }
 
@@ -68,7 +69,8 @@ class CoordinatorCompreExamController extends Controller
                 : (Schema::hasColumn('exam_application', 'id') ? 'id' : 'created_at'))
             : null;
 
-        $rows = $students->map(function ($s) use ($hasExamApp, $orderCol) {
+        $hasExamPayments = Schema::hasTable('payment_submissions');
+        $rows = $students->map(function ($s) use ($hasExamApp, $orderCol, $hasExamPayments) {
             $sid = $s->school_id ?? $s->id;
 
             $latest = null;
@@ -78,6 +80,12 @@ class CoordinatorCompreExamController extends Controller
                     ->orderByDesc($orderCol)
                     ->first();
             }
+            $examSchedule = $latest
+                ? ComprehensiveExamSchedule::query()
+                    ->with('proctorUsers:id,first_name,middle_name,last_name')
+                    ->where('exam_application_id', $latest->application_id)
+                    ->first()
+                : null;
 
             $response = Schema::hasTable('student_responses')
                 ? StudentResponse::query()->where('user_id', $s->id)->latest('id')->first()
@@ -98,12 +106,21 @@ class CoordinatorCompreExamController extends Controller
                 : [];
 
             $elig = $this->computeEligibility($sid);
+            $paymentStatus = null;
+            if ($hasExamPayments) {
+                $paymentStatus = DB::table('payment_submissions')
+                    ->where('payment_type', 'exam')
+                    ->whereIn('student_id', array_filter([$sid, $s->id], fn ($id) => filled($id)))
+                    ->orderByDesc('payment_id')
+                    ->value('status');
+            }
 
             return [
                 'id' => (int) $s->id,
                 'application_id' => $latest ? (int) $latest->application_id : null,
                 'review_remarks' => $latest->review_remarks ?? null,
                 'reviewed_at' => $latest->reviewed_at ?? null,
+                'registrar_approval_status' => $latest->registrar_approval_status ?? 'pending',
                 'first_name' => $s->first_name ?? '',
                 'middle_name' => $s->middle_name ?? null,
                 'last_name' => $s->last_name ?? '',
@@ -117,9 +134,26 @@ class CoordinatorCompreExamController extends Controller
                 'applied' => (bool) $latest,
                 'submitted_at' => $latest->created_at ?? null,
                 'application_status' => $latest
-                    ? strtolower($latest->final_approval_status ?? 'pending')
+                    ? (in_array(strtolower($latest->final_approval_status ?? 'pending'), ['rejected'], true)
+                        || strtolower($latest->registrar_approval_status ?? 'pending') === 'rejected'
+                        ? 'rejected'
+                        : (strtolower($latest->registrar_approval_status ?? 'pending') !== 'approved'
+                            ? 'pending'
+                            : strtolower($latest->final_approval_status ?? 'pending')))
                     : 'not_yet_applied',
                 'permit_status' => $latest ? strtolower($latest->permit_status ?? 'pending') : null,
+                'payment_status' => $paymentStatus ? strtolower($paymentStatus) : null,
+                'exam_clearance_status' => $latest?->exam_clearance_status,
+                'exam_clearance_remarks' => $latest?->exam_clearance_remarks,
+                'exam_schedule' => $examSchedule ? [
+                    'id' => $examSchedule->id,
+                    'date' => $examSchedule->exam_date?->format('Y-m-d'),
+                    'time' => substr((string) $examSchedule->exam_time, 0, 5),
+                    'venue' => $examSchedule->venue,
+                    'proctor_ids' => $examSchedule->proctorUsers->pluck('id')->all(),
+                    'proctors' => $examSchedule->proctorUsers->map(fn (User $proctor) => $proctor->display_name)->all(),
+                    'teacher_assigned' => $examSchedule->teacher_assigned,
+                ] : null,
                 'subjects' => $subjects,
                 'response' => $response ? [
                     'id' => (int) $response->id,
@@ -143,37 +177,15 @@ class CoordinatorCompreExamController extends Controller
             'eligible' => $eligible,
             'notEligible' => $notEligible,
             'counts' => ['eligible' => $eligible->count(), 'notEligible' => $notEligible->count()],
-            ...$this->scheduleManagementData($user),
+            'proctorOptions' => $this->scheduleManagementData($user),
         ]);
     }
 
     private function scheduleManagementData(User $user): array
     {
         if ($user->role !== 'Coordinator') {
-            return ['schedules' => [], 'proctorOptions' => []];
+            return [];
         }
-
-        $schedules = ComprehensiveExamSchedule::query()
-            ->with('proctorUsers:id,first_name,last_name')
-            ->latest('exam_date')
-            ->latest('exam_time')
-            ->get(['id', 'program', 'exam_date', 'exam_time', 'venue', 'proctor_name', 'proctors', 'teacher_assigned'])
-            ->map(function (ComprehensiveExamSchedule $schedule): array {
-                $assignedProctors = $schedule->proctorUsers;
-
-                return [
-                    'id' => $schedule->id,
-                    'program' => $schedule->program,
-                    'exam_date' => $schedule->exam_date?->format('Y-m-d'),
-                    'exam_time' => $schedule->exam_time,
-                    'venue' => $schedule->venue,
-                    'proctors' => $assignedProctors->isNotEmpty()
-                        ? $assignedProctors->map(fn (User $proctor) => $proctor->display_name)->all()
-                        : ($schedule->proctors ?: array_filter([$schedule->proctor_name])),
-                    'proctor_ids' => $assignedProctors->pluck('id')->all(),
-                    'teacher_assigned' => $schedule->teacher_assigned,
-                ];
-            });
 
         $proctorOptions = User::query()
             ->where('role', 'Proctor')
@@ -184,12 +196,10 @@ class CoordinatorCompreExamController extends Controller
                 'id' => $proctor->id,
                 'name' => $proctor->display_name,
                 'email' => $proctor->email,
-            ]);
+            ])
+            ->all();
 
-        return [
-            'schedules' => $schedules,
-            'proctorOptions' => $proctorOptions,
-        ];
+        return $proctorOptions;
     }
 
     public function review(Request $request, ExamApplication $application)
@@ -209,6 +219,7 @@ class CoordinatorCompreExamController extends Controller
             if ($user->role !== 'Administrative Assistant') {
                 abort_unless(in_array($student->program, $access->programs($user), true), 403);
             }
+            abort_unless(strtolower($application->registrar_approval_status ?? 'pending') === 'approved', 409, 'The Registrar must approve this application first.');
             abort_unless(strtolower($application->final_approval_status ?? 'pending') === 'pending', 409, 'This application has already been reviewed.');
             $application->update([
                 'final_approval_status' => $data['decision'], 'final_approval_DATE' => now(),
@@ -218,11 +229,84 @@ class CoordinatorCompreExamController extends Controller
             Notification::create([
                 'user_id' => $student->id, 'type' => 'comprehensive-exam-reviewed',
                 'title' => 'Comprehensive exam application '.$data['decision'],
-                'message' => $user->display_name.' '.$data['decision'].' your comprehensive exam application.'.(! empty($data['remarks']) ? ' '.$data['remarks'] : ''),
+                'message' => $data['decision'] === 'approved'
+                    ? 'Your Comprehensive Exam application has been approved. You may now submit your exam payment.'
+                    : $user->display_name.' rejected your comprehensive exam application.'.(! empty($data['remarks']) ? ' '.$data['remarks'] : ''),
                 'link' => '/comprehensive-exam', 'read' => false,
             ]);
 
             return response()->json(['ok' => true, 'status' => $data['decision']]);
+        });
+    }
+
+    public function setExamClearance(Request $request, ExamApplication $application)
+    {
+        $user = $request->user();
+        abort_unless($user->role === 'Administrative Assistant', 403);
+
+        $data = $request->validate([
+            'decision' => ['required', 'in:allowed,not_allowed'],
+            'remarks' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        return DB::transaction(function () use ($application, $user, $data) {
+            $application = ExamApplication::query()
+                ->whereKey($application->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            abort_unless(
+                strtolower($application->registrar_approval_status ?? 'pending') === 'approved'
+                    && strtolower($application->final_approval_status ?? 'pending') === 'approved',
+                409,
+                'The Registrar and Administrative Assistant must approve the application first.'
+            );
+
+            $studentId = (string) $application->student_id;
+            $student = User::query()
+                ->where('school_id', $studentId)
+                ->when(ctype_digit($studentId), fn ($query) => $query->orWhereKey((int) $studentId))
+                ->firstOrFail();
+
+            $payment = DB::table('payment_submissions')
+                ->where('payment_type', 'exam')
+                ->whereIn('student_id', array_filter([$student->id, $student->school_id]))
+                ->orderByDesc('payment_id')
+                ->lockForUpdate()
+                ->first(['status']);
+
+            abort_unless($payment && strtolower($payment->status) === 'approved', 409, 'The student must have an approved exam payment first.');
+
+            $application->update([
+                'exam_clearance_status' => $data['decision'],
+                'exam_clearance_remarks' => $data['remarks'] ?? null,
+                'exam_cleared_by' => $user->id,
+                'exam_cleared_at' => now(),
+            ]);
+
+            $coordinatorIds = CoordinatorProgram::query()
+                ->where('program', $application->program)
+                ->whereHas('coordinator', fn ($query) => $query->where('role', 'Coordinator'))
+                ->pluck('coordinator_id')
+                ->unique();
+
+            foreach ($coordinatorIds as $coordinatorId) {
+                Notification::create([
+                    'user_id' => $coordinatorId,
+                    'type' => 'comprehensive-exam-clearance',
+                    'title' => 'Comprehensive exam clearance updated',
+                    'message' => $student->display_name.' was marked '.str_replace('_', ' ', $data['decision']).' to take the comprehensive exam.'
+                        .(! empty($data['remarks']) ? ' '.$data['remarks'] : ''),
+                    'link' => '/coordinator/compre-exam',
+                    'read' => false,
+                ]);
+            }
+
+            return response()->json([
+                'ok' => true,
+                'status' => $data['decision'],
+                'remarks' => $data['remarks'] ?? null,
+            ]);
         });
     }
 

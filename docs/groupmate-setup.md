@@ -106,6 +106,8 @@ Use separate browser profiles or a private window for different roles. Begin wit
 
 The database starts empty except for migrations, demo accounts, and program choices. Bring your own dummy test documents. Do not upload real student records to GitHub.
 
+Comprehensive Exam applications are reviewed by the Registrar first and then the Administrative Assistant. Students can submit exam payment only after both approvals.
+
 Google sign-in needs your own authorized Google OAuth credentials and the exact callback `http://127.0.0.1:8001/auth/google/callback`. It is optional for local demo testing. School eligibility checks require the authorized school portal connection; demo login does not supply that connection. Comprehensive Exam submission may therefore be blocked by the eligibility check. Email is logged locally instead of delivered to Gmail by default.
 
 See [integration details and limitations](integration-setup.md) and [implemented improvements](implemented-improvements-2026-10-24.md) for the workflows and remaining client decisions. This is a testing project, not a production deployment.

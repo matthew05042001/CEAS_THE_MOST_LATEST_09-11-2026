@@ -8,6 +8,7 @@ type RegistrarApplication = {
     student_name: string;
     student_email: string | null;
     student_id: string;
+    aa_evaluated: boolean;
     program: string;
     school_year: string | null;
     created_at: string;
@@ -105,6 +106,7 @@ export default function RegistrarDashboard() {
                                     <th className="px-4 py-3 font-medium">School year</th>
                                     <th className="px-4 py-3 font-medium">Exam subjects</th>
                                     <th className="px-4 py-3 font-medium">Action</th>
+                                    <th className="px-4 py-3 font-medium">AA evaluation</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -142,6 +144,17 @@ export default function RegistrarDashboard() {
                                             >
                                                 {approvingId === application.application_id ? 'Approving...' : 'Approve'}
                                             </Button>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <span
+                                                className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${
+                                                    application.aa_evaluated
+                                                        ? 'border-green-200 bg-green-100 text-green-700 dark:border-green-900 dark:bg-green-950 dark:text-green-300'
+                                                        : 'border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300'
+                                                }`}
+                                            >
+                                                {application.aa_evaluated ? 'Evaluated' : 'Not evaluated'}
+                                            </span>
                                         </td>
                                     </tr>
                                 ))}

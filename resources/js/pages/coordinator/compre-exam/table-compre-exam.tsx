@@ -10,7 +10,15 @@ import { useMemo, useState } from 'react';
 import type { CompreExamApplicationSummary } from './Index';
 import Details from './details';
 
-type Columns = { student: boolean; program: boolean; eligibility: boolean; applied: boolean; appStatus: boolean; actions: boolean };
+type Columns = {
+    student: boolean;
+    program: boolean;
+    eligibility: boolean;
+    applied: boolean;
+    appStatus: boolean;
+    examClearance: boolean;
+    actions: boolean;
+};
 
 type Props = {
     paged: CompreExamApplicationSummary[];
@@ -79,7 +87,8 @@ export default function TableCompreExam({ paged, columns }: Props) {
         );
     };
 
-    const appStatusBadge = (s: CompreExamApplicationSummary['application_status']) => {
+    const appStatusBadge = (application: CompreExamApplicationSummary) => {
+        const s = application.application_status;
         const v = s || 'not_yet_applied';
         const map: Record<string, string> = {
             approved: 'bg-green-100 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-900',
@@ -87,9 +96,43 @@ export default function TableCompreExam({ paged, columns }: Props) {
             pending: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-900',
             not_yet_applied: 'bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-900 dark:text-zinc-300 dark:border-zinc-800',
         };
-        const label = v === 'not_yet_applied' ? 'Not yet applied' : v[0].toUpperCase() + v.slice(1);
+        const label =
+            v === 'not_yet_applied'
+                ? 'Not yet applied'
+                : v === 'pending'
+                  ? application.registrar_approval_status === 'approved'
+                      ? 'Awaiting AA review'
+                      : 'Awaiting Registrar'
+                  : v[0].toUpperCase() + v.slice(1);
         return (
             <Badge className={'rounded-full ' + map[v]} variant="outline">
+                {label}
+            </Badge>
+        );
+    };
+
+    const examClearanceBadge = (application: CompreExamApplicationSummary) => {
+        const status = application.exam_clearance_status;
+        const label = !application.applied
+            ? '—'
+            : status === 'allowed'
+              ? 'Allowed to take exam'
+              : status === 'not_allowed'
+                ? 'Not allowed to take exam'
+                : application.application_status !== 'approved'
+                  ? 'Waiting for application approval'
+                  : application.payment_status !== 'approved'
+                    ? 'Waiting for payment approval'
+                    : 'Waiting for AA decision';
+        const className =
+            status === 'allowed'
+                ? 'border-green-200 bg-green-100 text-green-700 dark:border-green-900 dark:bg-green-950 dark:text-green-300'
+                : status === 'not_allowed'
+                  ? 'border-rose-200 bg-rose-100 text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300'
+                  : 'border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300';
+
+        return (
+            <Badge variant="outline" className={`rounded-full ${className}`}>
                 {label}
             </Badge>
         );
@@ -199,6 +242,9 @@ export default function TableCompreExam({ paged, columns }: Props) {
                                 Application status
                             </TableHead>
                         )}
+                        {columns.examClearance && (
+                            <TableHead className="dark:bg-muted/30 dark:text-muted-foreground px-2 py-2 text-center">Exam clearance</TableHead>
+                        )}
                         {columns.actions && (
                             <TableHead className="dark:bg-muted/30 dark:text-muted-foreground w-[10%] px-1 py-2 text-center">Actions</TableHead>
                         )}
@@ -246,7 +292,9 @@ export default function TableCompreExam({ paged, columns }: Props) {
                                 </TableCell>
                             )}
 
-                            {columns.appStatus && <TableCell className="px-1 py-2 text-center">{appStatusBadge(r.application_status)}</TableCell>}
+                            {columns.appStatus && <TableCell className="px-1 py-2 text-center">{appStatusBadge(r)}</TableCell>}
+
+                            {columns.examClearance && <TableCell className="px-2 py-2 text-center">{examClearanceBadge(r)}</TableCell>}
 
                             {columns.actions && (
                                 <TableCell className="px-1 py-2 text-center">

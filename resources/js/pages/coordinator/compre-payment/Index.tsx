@@ -23,6 +23,7 @@ export type ComprePaymentSummary = {
 };
 
 type PageProps = {
+    auth: { user: { role: string } };
     programs: string[];
     pending: ComprePaymentSummary[];
     approved: ComprePaymentSummary[];
@@ -33,6 +34,7 @@ type PageProps = {
 export default function CoordinatorComprePaymentIndex() {
     const { props } = usePage<PageProps>();
     const { pending = [], approved = [], rejected = [], counts } = props;
+    const isAssistant = props.auth.user.role === 'Administrative Assistant';
 
     const [tab, setTab] = useState<'pending' | 'rejected' | 'approved'>('pending');
     const [q, setQ] = useState('');
@@ -153,6 +155,7 @@ export default function CoordinatorComprePaymentIndex() {
                         paged={paged}
                         columns={columns}
                         tabType={tab}
+                        canReview={isAssistant}
                         onRowApprove={(id) => console.log('approve payment', id)}
                         onRowReject={(id) => console.log('reject payment', id)}
                         onRowRetrieve={(id) => console.log('retrieve payment', id)}

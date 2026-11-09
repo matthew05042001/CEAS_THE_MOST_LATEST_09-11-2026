@@ -9,10 +9,21 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('exam_application', function (Blueprint $table) {
-            $table->string('registrar_approval_status')->default('pending');
-            $table->timestamp('registrar_approved_at')->nullable();
-            $table->foreignId('registrar_approved_by')->nullable()->constrained('users')->nullOnDelete();
-            $table->index(['final_approval_status', 'registrar_approval_status'], 'exam_app_registrar_approval_idx');
+            if (! Schema::hasColumn('exam_application', 'registrar_approval_status')) {
+                $table->string('registrar_approval_status')->default('pending');
+            }
+
+            if (! Schema::hasColumn('exam_application', 'registrar_approved_at')) {
+                $table->timestamp('registrar_approved_at')->nullable();
+            }
+
+            if (! Schema::hasColumn('exam_application', 'registrar_approved_by')) {
+                $table->foreignId('registrar_approved_by')->nullable()->constrained('users')->nullOnDelete();
+            }
+
+            if (! Schema::hasIndex('exam_application', 'exam_app_registrar_approval_idx')) {
+                $table->index(['final_approval_status', 'registrar_approval_status'], 'exam_app_registrar_approval_idx');
+            }
         });
     }
 

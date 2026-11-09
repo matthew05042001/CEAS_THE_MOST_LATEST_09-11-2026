@@ -1,9 +1,9 @@
 import { Input } from '@/components/ui/input';
+import { Toaster } from '@/components/ui/sonner';
 import AppLayout from '@/layouts/app-layout';
 import { usePage } from '@inertiajs/react';
 import { PaperclipIcon, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import CoordinatorCompreScheduleManagement from './schedule-management';
 import TableCompreExam from './table-compre-exam';
 
 export type CompreExamApplicationSummary = {
@@ -11,6 +11,7 @@ export type CompreExamApplicationSummary = {
     application_id?: number | null;
     review_remarks?: string | null;
     reviewed_at?: string | null;
+    registrar_approval_status: 'approved' | 'pending' | 'rejected';
     first_name: string;
     middle_name: string | null;
     last_name: string;
@@ -23,6 +24,18 @@ export type CompreExamApplicationSummary = {
     submitted_at: string | null;
     application_status: 'approved' | 'pending' | 'rejected' | 'not_yet_applied';
     permit_status: 'approved' | 'pending' | 'rejected' | null;
+    payment_status: 'approved' | 'pending' | 'rejected' | null;
+    exam_clearance_status: 'allowed' | 'not_allowed' | null;
+    exam_clearance_remarks: string | null;
+    exam_schedule: {
+        id: number;
+        date: string;
+        time: string;
+        venue: string;
+        proctor_ids: number[];
+        proctors: string[];
+        teacher_assigned: string | null;
+    } | null;
     subjects: {
         name: string | null;
         code: string | null;
@@ -49,23 +62,12 @@ type PageProps = {
     eligible: CompreExamApplicationSummary[];
     notEligible: CompreExamApplicationSummary[];
     counts?: { eligible: number; notEligible: number };
-    schedules: {
-        id: number;
-        program: string;
-        exam_date: string;
-        exam_time: string;
-        venue: string;
-        proctors?: string[];
-        proctor_ids?: Array<number | ''>;
-        teacher_assigned: string | null;
-    }[];
     proctorOptions: { id: number; name: string; email: string }[];
 };
 
 export default function CoordinatorCompreExamIndex() {
     const { props } = usePage<PageProps>();
     const { eligible = [], notEligible = [] } = props;
-    const isCoordinator = props.auth.user.role === 'Coordinator';
 
     const [tab, setTab] = useState<'applications' | 'students'>('applications');
     const [q, setQ] = useState('');
@@ -84,10 +86,19 @@ export default function CoordinatorCompreExamIndex() {
         );
     }, [data, q]);
 
-    const columns = { student: true, program: true, eligibility: true, applied: true, appStatus: true, actions: true };
+    const columns = {
+        student: true,
+        program: true,
+        eligibility: true,
+        applied: true,
+        appStatus: true,
+        examClearance: true,
+        actions: true,
+    };
 
     return (
         <AppLayout>
+            <Toaster richColors position="bottom-right" closeButton />
             <div className="px-7 pt-5 pb-6">
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                     <div className="flex items-center gap-2">
@@ -124,9 +135,6 @@ export default function CoordinatorCompreExamIndex() {
                 <div className="mt-3">
                     <TableCompreExam paged={paged} columns={columns} />
                 </div>
-                {isCoordinator && (
-                    <CoordinatorCompreScheduleManagement schedules={props.schedules ?? []} proctorOptions={props.proctorOptions ?? []} />
-                )}
             </div>
         </AppLayout>
     );
